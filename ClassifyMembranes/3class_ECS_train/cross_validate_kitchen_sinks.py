@@ -1,4 +1,4 @@
-#!/usr/bin/env /Users/thouis/VENV/bin/python
+#!/usr/bin/env Python27epd64
 
 import sys
 import threading
@@ -11,6 +11,8 @@ import random
 import cv2
 import h5py
 
+import glob
+import warnings
 
 import pycuda.driver as cuda
 import pycuda.autoinit
@@ -19,7 +21,7 @@ import pycuda.gpuarray
 
 NUM_RANDOM_FEATURES = 2000
 
-cudafuncs = SourceModule(open("thresher.cu").read())
+cudafuncs = SourceModule(open(r"C:\Users\DanielMiron\rhoana\ClassifyMembranes\3class_ECS_train\thresher.cu").read())
 
 def extract_data(labeled_images, feature_files):
     '''For N labeled pixels with K features, returns:
@@ -43,7 +45,7 @@ def extract_data(labeled_images, feature_files):
         mask2 = im[:, :, 2] > np.maximum(im[:, :, 0], im[:, :, 1])
         mask_all = (mask0 | mask1 | mask2)
         labels.append((mask1 * 1 + mask2 * 2)[mask_all])
-        data.append([f[feature][...][mask_all].astype(np.float32) for feature in feature_names])
+        data.append([f[feature][...][mask_all].astype(np.float32) * (0 if feature == feature_names[0] else 1) for feature in feature_names])
         f.close()
     return np.hstack(data), np.hstack(labels).astype(np.int32), feature_names
 
@@ -127,8 +129,9 @@ def balanced_choice(pop, count):
 
 if __name__ == '__main__':
     sys.argv.pop(0)
-    labeled_images = sys.argv[:(len(sys.argv) // 2)]
-    feature_files = sys.argv[(len(sys.argv) // 2):]
+    
+    labeled_images = glob.glob(sys.argv[0] + '\*.tif')
+    feature_files = glob.glob(sys.argv[0] + '\*.hdf5')
     assert len(labeled_images) == len(feature_files)
 
     D = []
@@ -137,11 +140,13 @@ if __name__ == '__main__':
         d, l, names = extract_data([li], [ff])
         D.append(d)
         L.append(l)
+      
         print "Labeled data for %s:", li
         for val in range(3):
             print "     label = ", val, ", count:", np.sum(L[-1] == val)
 
     indices = balanced_choice(D[0].shape[0], NUM_RANDOM_FEATURES)
+    indices.sort()
     # assume the training sets are roughly balanced
     thresholds = [np.random.choice(random.choice(D)[idx, :]) for idx in indices]
 
@@ -169,10 +174,12 @@ if __name__ == '__main__':
         prods.append(prod)
         rhss.append(rhs)
     print prod
-
+    
     fullprod = sum(prods)
     fullrhs = sum(rhss)
-
+    
+    tot_err = 0
+    warnings.filterwarnings('default')
     for idx, (d, l) in enumerate(zip(D, L)):
         allbut_prod = fullprod - prods[idx]
         allbut_rhs = fullrhs - rhss[idx]
@@ -182,4 +189,47 @@ if __name__ == '__main__':
             predicted_labels += w * (d[feature_idx, :] > t)
         err = np.abs(l - predicted_labels) - 0.5
         err[err < 0] = 0
+        tot_err += np.sum(err)
         print idx, np.sum(err)
+    print tot_err, "error with all features"
+        
+    err_diff = []
+    #for each feature find the first and last location in indices
+    #NOTE 1 in temporarily for testing/debugging (correct line is range(indices[-1])
+    for i in range(1):
+        first_loc = indices.index(i)
+        if (i == indices[-1]):
+            last_loc = indices.length()
+        else: 
+            last_loc = indices.index(i+1)-1
+            
+        cut_prods = []
+        cut_rhss = []
+        for prod, rhs in zip(prods, rhss):
+            up = np.hstack([prod[:first_loc, :first_loc], prod[:first_loc, last_loc+1:]])
+            low = np.hstack([prod[last_loc+1:, :first_loc], prod[last_loc+1:, last_loc+1:]])
+            cut_prod = np.vstack([up, low])
+            cut_rhs =np.hstack([rhs[:first_loc], rhs[last_loc+1:]])
+            cut_prods.append(cut_prod)
+            cut_rhss.append(cut_rhs)
+
+    
+        cut_fullprod = sum(cut_prods)
+        cut_fullrhs = sum(cut_rhss)
+               
+        err_sum = 0       
+        for idx, (d, l) in enumerate(zip(D, L)):
+            allbut_prod = cut_fullprod - cut_prods[idx]
+            allbut_rhs = cut_fullrhs - cut_rhss[idx]
+            weights, residuals, rank, s = np.linalg.lstsq(allbut_prod, allbut_rhs)
+            predicted_labels = np.zeros(l.size)
+            for feature_idx, w, t in zip(indices, weights, thresholds):
+                predicted_labels += w * (d[feature_idx, :] > t)
+            err = np.abs(l - predicted_labels) - 0.5
+            err[err < 0] = 0
+            err_sum += np.sum(err)
+            print idx, np.sum(err)
+        err_diff.append([i, err_sum-tot_err])
+        print err_sum-tot_err
+    err_diff.sort(key = lambda x: x[1])
+    print err_diff
