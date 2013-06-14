@@ -189,13 +189,13 @@ if __name__ == '__main__':
         err = np.abs(l - predicted_labels) - 0.5
         err[err < 0] = 0
         tot_err += np.sum(err)
-        print idx, np.sum(err)
+        #print idx, np.sum(err)
     print tot_err, "error with all features"
         
     err_diff = []
-    feature_lists =[]
-    for i in range(len(names)):
-        feature_lists += [[i]]
+    #feature_lists =[range(21), range(22,32), range(34,42), range(49, 59), \
+    #                range(59, 69), range(69, 79), range(79, 89), range(89, 94), range(94,98)]
+    feature_lists = [range(42,48)]
     for features in feature_lists: 
         err_sum = 0    
         for idx, (d, l) in enumerate(zip(D, L)):
@@ -215,8 +215,8 @@ if __name__ == '__main__':
             err = np.abs(l - predicted_labels) - 0.5
             err[err < 0] = 0
             err_sum += np.sum(err)
-            print idx, np.sum(err)
+            #print idx, np.sum(err)
         err_diff.append([features, err_sum-tot_err])
-        print err_sum-tot_err, features, \n
+        print err_sum-tot_err, features, "\n"
     err_diff.sort(key = lambda x: x[1])
     print err_diff
