@@ -193,9 +193,12 @@ if __name__ == '__main__':
     print tot_err, "error with all features"
         
     err_diff = []
-    #feature_lists =[range(21), range(22,32), range(34,42), range(49, 59), \
-    #                range(59, 69), range(69, 79), range(79, 89), range(89, 94), range(94,98)]
-    feature_lists = [range(42,48)]
+    feature_lists =[range(21), range(22,32), range(34,42), range(49, 59), \
+                    range(59, 69), range(69, 79), range(79, 89), range(89, 94), range(94,98), range(89, 98)]
+    #feature_lists = []
+    #for i in range(98):
+    #    feature_lists += [[i]]
+    #feature_lists = [range(1)]
     for features in feature_lists: 
         err_sum = 0    
         for idx, (d, l) in enumerate(zip(D, L)):
