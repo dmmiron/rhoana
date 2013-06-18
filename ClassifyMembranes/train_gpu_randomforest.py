@@ -467,169 +467,182 @@ extern "C" __global__ void trainKernel(
 # input_features_suffix = '_rhoanafeatures.hdf5'
 # output_path = 'D:\\dev\\Rhoana\\classifierTraining\\membraneDetectionECSx4ds2\\rhoana_forest.hdf5'
 
-input_image_folder = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\training\\'
-input_image_suffix = '_labeled.png'
-input_features_suffix = '.hdf5'
-output_path = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\rhoana_forest_3class.hdf5'
+#input_image_folder = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\training\\'
+#input_image_suffix = '_labeled.png'
+#input_features_suffix = '.hdf5'
+#output_path = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\rhoana_forest_3class.hdf5'
 
+def train(image_folder, output_path, feature_list):
+    
+    labeled_images = sorted(glob.glob(image_folder + '\*.tif'))
+    feature_files = sorted(glob.glob(image_folder + '\*.hdf5'))
+    output_path = 'C:\\Users\\DanielMiron\\Documents\\rhoana_forest_3class.hdf5'
+    
+    
+    # Prep the gpu function
+    gpu_train = nvcc.SourceModule(gpu_randomforest_train_source, no_extern_c=True).get_function('trainKernel')
+    
+    # Load training data
+    
+    # 2 Class
+    #class_colors = [[255,0,0], [0,255,0]]
+    #class_colors = [[255,85,255], [255,255,0]]
+    
+    # 3 Class
+    #class_colors = [[255,0,0], [0,255,0], [0,0,255]]
+    #class_colors = [[255,85,255], [255,255,0], [0,255,255]]
+    
+    class_colors = [0, 1, 2]
+    
+    nclass = len(class_colors)
+    
+    training_x = np.zeros((0,0), dtype=np.float32) #pixel data
+    training_y = np.zeros((0,1), dtype=np.int32) #labels
+    
+    print 'Found {0} training images.'.format(len(labeled_images))
+    
+    # Loop through all images
+    for im_file, f_file in zip(labeled_images, feature_files):
+   	training_image = mahotas.imread(im_file)
+    
+   	for classi in range(nclass):
+    
+  		this_color = class_colors[classi]
+    
+  		# Find pixels for this class
+  		class_indices = np.nonzero(np.logical_and(
+ 			training_image[:,:,this_color] > training_image[:,:,(this_color + 1) % 3],
+ 			training_image[:,:,this_color] > training_image[:,:,(this_color + 2) % 3]))
+    
+  		# class_indices = np.nonzero(np.logical_and(
+  		# 	training_image[:,:,0] == this_color[0],
+  		# 	training_image[:,:,1] == this_color[1],
+  		# 	training_image[:,:,2] == this_color[2]))
+    
+  		# Add features to x and classes to y
+    
+  		training_y = np.concatenate((training_y, np.ones((len(class_indices[0]), 1), dtype=np.int32) * (classi + 1)))
+    
+  		# Load the features
+  		f = h5py.File(f_file, 'r')
+    
+  		nfeatures = len(f.keys())-len(feature_list)
+  		train_features = np.zeros((nfeatures, len(class_indices[0])), dtype=np.float32)
+    
+                j = 0
+  		for i,k in enumerate(f.keys()):
+  		    if (not i in feature_list):
+ 			feature = f[k][...]
+ 			train_features[j,:] = feature[class_indices[0], class_indices[1]]
+ 			j += 1
+ 			
+  		if training_x.size > 0:
+ 			training_x = np.concatenate((training_x, train_features), axis=1)
+  		else:
+ 			training_x = train_features
 
-# Prep the gpu function
-gpu_train = nvcc.SourceModule(gpu_randomforest_train_source, no_extern_c=True).get_function('trainKernel')
-
-# Load training data
-files = sorted( glob.glob( input_image_folder + '\\*' + input_image_suffix ) )
-
-# 2 Class
-#class_colors = [[255,0,0], [0,255,0]]
-#class_colors = [[255,85,255], [255,255,0]]
-
-# 3 Class
-#class_colors = [[255,0,0], [0,255,0], [0,0,255]]
-#class_colors = [[255,85,255], [255,255,0], [0,255,255]]
-
-class_colors = [0, 1, 2]
-
-nclass = len(class_colors)
-
-training_x = np.zeros((0,0), dtype=np.float32)
-training_y = np.zeros((0,1), dtype=np.int32)
-
-print 'Found {0} training images.'.format(len(files))
-
-# Loop through all images
-for file in files:
-	training_image = mahotas.imread(file)
-
-	for classi in range(nclass):
-
-		this_color = class_colors[classi]
-
-		# Find pixels for this class
-		class_indices = np.nonzero(np.logical_and(
-			training_image[:,:,this_color] > training_image[:,:,(this_color + 1) % 3],
-			training_image[:,:,this_color] > training_image[:,:,(this_color + 2) % 3]))
-
-		# class_indices = np.nonzero(np.logical_and(
-		# 	training_image[:,:,0] == this_color[0],
-		# 	training_image[:,:,1] == this_color[1],
-		# 	training_image[:,:,2] == this_color[2]))
-
-		# Add features to x and classes to y
-
-		training_y = np.concatenate((training_y, np.ones((len(class_indices[0]), 1), dtype=np.int32) * (classi + 1)))
-
-		# Load the features
-		f = h5py.File(file.replace(input_image_suffix, input_features_suffix), 'r')
-
-		nfeatures = len(f.keys())
-		train_features = np.zeros((nfeatures, len(class_indices[0])), dtype=np.float32)
-
-		for i,k in enumerate(f.keys()):
-			feature = f[k][...]
-			train_features[i,:] = feature[class_indices[0], class_indices[1]]
-
-		if training_x.size > 0:
-			training_x = np.concatenate((training_x, train_features), axis=1)
-		else:
-			training_x = train_features
-
-for classi in range(nclass):
-	print 'Class {0}: {1} training pixels.'.format(classi, np.sum(training_y == classi + 1))
-
-# Train on GPU
-ntree = np.int32(512)
-mtry = np.int32(np.floor(np.sqrt(training_x.shape[0])))
-#nsamples = np.ones((1,nclass), dtype=np.int32) * (training_x.shape[1] / nclass)
-nsamples = np.ones((1,nclass), dtype=np.int32) * 1000
-classweights = np.ones((1,nclass), dtype=np.float32)
-
-# Sanity check
-assert(training_x.shape[1] == training_y.shape[0])
-
-# Random number seeds
-seed = np.int64(42)
-sequencestart = np.int64(43)
-
-samplefrom = np.zeros((nclass), dtype=np.int32)
-maxTreeSize = np.int32(2 * np.sum(nsamples) + 1)
-nodeStopSize = np.int32(1)
-
-for classi in range(nclass):
-	samplefrom[classi] = np.sum(training_y == (classi + 1))
-
-maxnsamples = np.max(nsamples)
-classindex = -1 * np.ones((np.max(samplefrom) * nclass), dtype=np.int32)
-
-cioffset = 0
-for classi in range(nclass):
-	classindex[cioffset:cioffset + samplefrom[classi]] = np.nonzero(training_y == (classi + 1))[0]
-	cioffset = cioffset + samplefrom[classi]
-
-bagmem = -1 * np.ones((ntree, maxnsamples * nclass), dtype=np.int32)
-d_bagspace = gpuarray.to_gpu(bagmem)
-d_tempbag = gpuarray.to_gpu(bagmem)
-bagmem = None
-
-d_treemap = gpuarray.zeros((long(ntree * 2), long(maxTreeSize)), np.int32)
-d_nodestatus = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-d_xbestsplit = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.float32)
-#d_nbestsplit = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-#d_bestgini = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.float32)
-d_bestvar = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-d_nodeclass = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-d_ndbigtree = gpuarray.zeros((long(ntree), 1), np.int32)
-d_nodestart = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-d_nodepop = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
-d_classpop = gpuarray.zeros((long(ntree), long(maxTreeSize*nclass)), np.int32)
-d_classweights = gpuarray.to_gpu(classweights)
-d_weight_left = gpuarray.zeros((long(ntree), long(nclass)), np.int32)
-d_weight_right = gpuarray.zeros((long(ntree), long(nclass)), np.int32)
-d_dimtemp = gpuarray.zeros((long(ntree), long(training_x.shape[0])), np.int32)
-
-d_baggedx = gpuarray.zeros((long(np.sum(nsamples)*training_x.shape[0]), long(ntree)), np.float32)
-d_baggedclass = gpuarray.zeros((long(ntree), long(np.sum(nsamples))), np.int32)
-
-d_training_x = gpuarray.to_gpu(training_x)
-d_training_y = gpuarray.to_gpu(training_y)
-d_classindex = gpuarray.to_gpu(classindex)
-d_nsamples = gpuarray.to_gpu(nsamples)
-d_samplefrom = gpuarray.to_gpu(samplefrom)
-
-threadsPerBlock = 32
-block = (32, 1, 1)
-grid = (int(ntree / block[0] + 1), 1)
-
-gpu_train(d_training_x, np.int32(training_x.shape[1]), np.int32(training_x.shape[0]), np.int32(nclass),
-	d_training_y, d_classindex, d_nsamples, d_samplefrom,
-	np.int32(maxnsamples), seed, sequencestart, np.int32(ntree), np.int32(maxTreeSize), np.int32(mtry), np.int32(nodeStopSize),
-	d_treemap, d_nodestatus, d_xbestsplit,
-	d_bestvar, d_nodeclass, d_ndbigtree,
-	d_nodestart, d_nodepop,
-	d_classpop, d_classweights,
-	d_weight_left, d_weight_right,
-	d_dimtemp, d_bagspace, d_tempbag, d_baggedx, d_baggedclass,
-	block=block, grid=grid)
-
-treemap = d_treemap.get()
-nodestatus = d_nodestatus.get()
-xbestsplit = d_xbestsplit.get()
-bestvar = d_bestvar.get()
-nodeclass = d_nodeclass.get()
-ndbigtree = d_ndbigtree.get()
-
-# Save results
-out_hdf5 = h5py.File(output_path, 'w')
-out_hdf5['/forest/treemap'] = treemap
-out_hdf5['/forest/nodestatus'] = nodestatus
-out_hdf5['/forest/xbestsplit'] = xbestsplit
-out_hdf5['/forest/bestvar'] = bestvar
-out_hdf5['/forest/nodeclass'] = nodeclass
-out_hdf5['/forest/ndbigtree'] = ndbigtree
-
-out_hdf5['/forest/nrnodes'] = maxTreeSize
-out_hdf5['/forest/ntree'] = ntree
-out_hdf5['/forest/nclass'] = nclass
-out_hdf5['/forest/classweights'] = classweights
-out_hdf5['/forest/mtry'] = mtry
-
-out_hdf5.close()
+    training_x = np.copy(training_x[:,1::2], order='C') #must be C or Fortran contiguous for gpu array
+    training_y = np.copy(training_y[1::2], order = 'C')
+    
+    print np.shape(training_x)
+    
+    for classi in range(nclass):
+   	print 'Class {0}: {1} training pixels.'.format(classi, np.sum(training_y == classi + 1))
+    
+    # Train on GPU
+    ntree = np.int32(512)
+    mtry = np.int32(np.floor(np.sqrt(training_x.shape[0])))
+    #nsamples = np.ones((1,nclass), dtype=np.int32) * (training_x.shape[1] / nclass)
+    nsamples = np.ones((1,nclass), dtype=np.int32) * 1000
+    classweights = np.ones((1,nclass), dtype=np.float32)
+    
+    # Sanity check
+    assert(training_x.shape[1] == training_y.shape[0])
+    
+    # Random number seeds
+    seed = np.int64(42)
+    sequencestart = np.int64(43)
+    
+    samplefrom = np.zeros((nclass), dtype=np.int32)
+    maxTreeSize = np.int32(2 * np.sum(nsamples) + 1)
+    nodeStopSize = np.int32(1)
+    
+    for classi in range(nclass):
+   	samplefrom[classi] = np.sum(training_y == (classi + 1))
+    
+    maxnsamples = np.max(nsamples)
+    classindex = -1 * np.ones((np.max(samplefrom) * nclass), dtype=np.int32)
+    
+    cioffset = 0
+    for classi in range(nclass):
+   	classindex[cioffset:cioffset + samplefrom[classi]] = np.nonzero(training_y == (classi + 1))[0]
+   	cioffset = cioffset + samplefrom[classi]
+    
+    bagmem = -1 * np.ones((ntree, maxnsamples * nclass), dtype=np.int32)
+    d_bagspace = gpuarray.to_gpu(bagmem)
+    d_tempbag = gpuarray.to_gpu(bagmem)
+    bagmem = None
+    
+    d_treemap = gpuarray.zeros((long(ntree * 2), long(maxTreeSize)), np.int32)
+    d_nodestatus = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    d_xbestsplit = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.float32)
+    #d_nbestsplit = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    #d_bestgini = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.float32)
+    d_bestvar = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    d_nodeclass = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    d_ndbigtree = gpuarray.zeros((long(ntree), 1), np.int32)
+    d_nodestart = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    d_nodepop = gpuarray.zeros((long(ntree), long(maxTreeSize)), np.int32)
+    d_classpop = gpuarray.zeros((long(ntree), long(maxTreeSize*nclass)), np.int32)
+    d_classweights = gpuarray.to_gpu(classweights)
+    d_weight_left = gpuarray.zeros((long(ntree), long(nclass)), np.int32)
+    d_weight_right = gpuarray.zeros((long(ntree), long(nclass)), np.int32)
+    d_dimtemp = gpuarray.zeros((long(ntree), long(training_x.shape[0])), np.int32)
+    
+    d_baggedx = gpuarray.zeros((long(np.sum(nsamples)*training_x.shape[0]), long(ntree)), np.float32)
+    d_baggedclass = gpuarray.zeros((long(ntree), long(np.sum(nsamples))), np.int32)
+    
+    d_training_x = gpuarray.to_gpu(training_x)
+    d_training_y = gpuarray.to_gpu(training_y)
+    d_classindex = gpuarray.to_gpu(classindex)
+    d_nsamples = gpuarray.to_gpu(nsamples)
+    d_samplefrom = gpuarray.to_gpu(samplefrom)
+    
+    threadsPerBlock = 32
+    block = (32, 1, 1)
+    grid = (int(ntree / block[0] + 1), 1)
+    
+    gpu_train(d_training_x, np.int32(training_x.shape[1]), np.int32(training_x.shape[0]), np.int32(nclass),
+   	d_training_y, d_classindex, d_nsamples, d_samplefrom,
+   	np.int32(maxnsamples), seed, sequencestart, np.int32(ntree), np.int32(maxTreeSize), np.int32(mtry), np.int32(nodeStopSize),
+   	d_treemap, d_nodestatus, d_xbestsplit,
+   	d_bestvar, d_nodeclass, d_ndbigtree,
+   	d_nodestart, d_nodepop,
+   	d_classpop, d_classweights,
+   	d_weight_left, d_weight_right,
+   	d_dimtemp, d_bagspace, d_tempbag, d_baggedx, d_baggedclass,
+   	block=block, grid=grid)
+    
+    treemap = d_treemap.get()
+    nodestatus = d_nodestatus.get()
+    xbestsplit = d_xbestsplit.get()
+    bestvar = d_bestvar.get()
+    nodeclass = d_nodeclass.get()
+    ndbigtree = d_ndbigtree.get()
+    
+    # Save results
+    out_hdf5 = h5py.File(output_path, 'w')
+    out_hdf5['/forest/treemap'] = treemap
+    out_hdf5['/forest/nodestatus'] = nodestatus
+    out_hdf5['/forest/xbestsplit'] = xbestsplit
+    out_hdf5['/forest/bestvar'] = bestvar
+    out_hdf5['/forest/nodeclass'] = nodeclass
+    out_hdf5['/forest/ndbigtree'] = ndbigtree
+    
+    out_hdf5['/forest/nrnodes'] = maxTreeSize
+    out_hdf5['/forest/ntree'] = ntree
+    out_hdf5['/forest/nclass'] = nclass
+    out_hdf5['/forest/classweights'] = classweights
+    out_hdf5['/forest/mtry'] = mtry
+    
+    out_hdf5.close()
