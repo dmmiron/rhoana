@@ -90,9 +90,11 @@ def predict(forest_file, input_image_folder, input_image_suffix, input_features_
     ntree = model['/forest/ntree'][...];
     nclass = model['/forest/nclass'][...];
         
+    model.close()
         
     im_files = sorted( glob.glob( input_image_folder + '\\*' + input_image_suffix ) )
     feature_files = sorted(glob.glob(input_image_folder + '\\*' + input_features_suffix))
+    print im_files, feature_files
         
     print 'Found {0} images to classify.'.format(len(im_files))
         
@@ -158,7 +160,7 @@ def predict(forest_file, input_image_folder, input_image_suffix, input_features_
         err_r = np.sum(~win_0[mask_r]) 
         err_g = np.sum(~win_1[mask_g])
         err_b = np.sum(~win_2[mask_b])
-        err = err_r+err_g+err_g
+        err = err_r+err_g+err_b
         tot_err += err
         
         

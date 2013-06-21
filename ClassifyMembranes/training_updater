@@ -1,0 +1,11 @@
+#-------------------------------
+#Training Updater-Adds new features and labels from sketch data and passes to training
+#Daniel Miron
+#6/21/2013
+#
+#-------------------------------
+import sys
+import h5py
+import numpy as np
+
+

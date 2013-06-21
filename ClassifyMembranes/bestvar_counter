@@ -1,0 +1,18 @@
+#-----------------------------
+#Random Forest Best Variable Counter
+#Daniel Miron
+#6/19/2013
+#
+#Counts and plots the number of times each feature was used in random forest classifier
+#-----------------------------
+
+import glob
+import sys
+import h5py
+
+
+forest_folder = "C:\\Users\\DanielMiron\\Documents\\autoencoder_out"
+
+forest_files = sorted(glob.glob(forest_folder + "\*.hdf5")
+
+print forest_files

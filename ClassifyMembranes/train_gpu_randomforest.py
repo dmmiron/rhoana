@@ -18,6 +18,7 @@ import time
 import gc
 
 import pycuda.autoinit
+import pycuda.tools
 import pycuda.driver as cu
 import pycuda.compiler as nvcc
 import pycuda.gpuarray as gpuarray
@@ -568,7 +569,7 @@ def make_forest(training_x, training_y, nclass, iteration, gpu_train, output_pat
         print 'Class {0}: {1} training pixels.'.format(classi, np.sum(training_y == classi + 1))
         
     # Train on GPU
-    ntree = np.int32(512)
+    ntree = np.int32(100)
     mtry = np.int32(np.floor(np.sqrt(training_x.shape[0])))
     #nsamples = np.ones((1,nclass), dtype=np.int32) * (training_x.shape[1] / nclass)
     nsamples = np.ones((1,nclass), dtype=np.int32) * 1000
@@ -658,6 +659,7 @@ def make_forest(training_x, training_y, nclass, iteration, gpu_train, output_pat
     print "forest making took", time.time()-st_f
     # Save results
     output_file = output_path + "_" + str(iteration)+ ".hdf5"
+    print output_file
     out_hdf5 = h5py.File(output_file, 'w')
     out_hdf5['/forest/treemap'] = treemap
     out_hdf5['/forest/nodestatus'] = nodestatus
