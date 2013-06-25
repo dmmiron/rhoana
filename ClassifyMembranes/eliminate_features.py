@@ -21,10 +21,10 @@ def main(argv):
     
     forest_file_prefix = '\\combined_forest'
     
-    #combined small forests
+    #combine small forests
     cons_forest_file = 'C:\\Users\\DanielMiron\\Documents\\combined_forests\\cons_forest.hdf5'
     
-    training_iterations = 5
+    training_iterations = 2
     
     #get features to eliminate from command line
     if (len(argv) > 1):
@@ -34,7 +34,7 @@ def main(argv):
     
     consolidate_trees(forest_folder, cons_forest_file)
     
-    input_image_folder = 'C:\\Users\\DanielMiron\\Documents\\combined_features'
+    input_image_folder = 'C:\\Users\\DanielMiron\\Documents\\training_files'
     input_image_suffix = '.tif'
     input_features_suffix = '.hdf5'
     output_folder = 'C:\\Users\\DanielMiron\\Documents\\combined_output\\'

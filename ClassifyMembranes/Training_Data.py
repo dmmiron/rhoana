@@ -16,12 +16,16 @@ import gc
 
 
 class Training_Data:
-    def __init__(self, image_folder, nclass, ntrees):
+    def __init__(self, image_folder):
         self.feature_file_names = sorted(glob.glob(image_folder + "\*.hdf5"))
         self.image_file_names = sorted(glob.glob(image_folder + "\*.tif"))
-        self.nclass = nclass
-        self.ntrees = ntrees
         self.features, self.labels, self.files, self.keys = self.extract_data(self.feature_file_names, self.image_file_names)
+        self.file_dict = self.make_file_dict()
+        
+    def make_file_dict(self):
+        #contains IMAGE name as key
+        file_dict = dict((ea[2],ea[0]) for ea in self.files)
+        return file_dict
         
     def extract_data(self, feature_file_names, image_file_names):
         '''Seeds the feature and label matrix with already labeled data'''
@@ -48,12 +52,12 @@ class Training_Data:
     
     
     #Currently assuming format of line data is [start, end, label, image]
-    def update_features(self, feature_file, lines):
+    def update_features(self, lines):
         '''Appends new data from drawn lines to feature and label matrices'''
         self.check_lines(lines)
         num_pixels =0
         new_labels = []
-        for idx, (start, end, label) in enumerate(lines):
+        for idx, (start, end, label, feature_file) in enumerate(lines):
             xdist = np.abs(start[0]-end[0])
             ydist = np.abs(start[1]-end[1])
             num_pixels+=max(xdist+1, ydist+1)
@@ -64,17 +68,18 @@ class Training_Data:
         #append the new pixel labels
         self.labels = np.hstack((self.labels, new_labels))
         
-        new_features = np.zeros((len(feature_file.keys()), num_pixels))
+        new_features = np.zeros((len(self.keys), num_pixels))
     
-        for idx, feature in enumerate(feature_file.keys()):
+        for idx, feature in enumerate(self.keys):
             offset = 0
-            for start, end, label in lines:
+            for start, end, label, feature_file in lines:
+                f_file = self.file_dict[feature_file]
                 #Get region of interest
                 mini = min(start[0], end[0])
                 maxi = max(start[0], end[0])
                 minj = min(start[1], end[1])
                 maxj = max(start[1], end[1])
-                roi  = feature_file[feature][mini:maxi+1, minj:maxj+1][...]
+                roi  = f_file[feature][mini:maxi+1, minj:maxj+1][...]
                 
                 #Get indices of pixels in line
                 steps = max(maxi-mini+1, maxj-minj+1) #num pixels is size of larger dimension +1
@@ -96,7 +101,7 @@ class Training_Data:
         
         #assumes all files are same size
         im_shape = np.shape(self.files[0][0][self.keys[0]])
-        for (start, end, label) in lines:
+        for start, end, label, feature_file in lines:
             print start, end, label
             if (start[0]>=im_shape[0] or end[0]>=im_shape[0]):
                 warnings.warn("One of the x values is too large. " + str(start) + " " + str(end))
@@ -113,7 +118,7 @@ class Training_Data:
                 
     def close_files(self):
         for file in self.files:
-            file.close()
-    
+            file[0].close()
+            
 data = Training_Data(r'C:\Users\DanielMiron\Documents\test')
-                
+

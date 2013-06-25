@@ -1,0 +1,9 @@
+#---------------------------
+#Forest Trainer
+#Daniel Miron
+#6/24/2013
+#
+#---------------------------
+
+class Trainer:
+    def __init__(self
