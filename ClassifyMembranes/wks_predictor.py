@@ -12,7 +12,7 @@ import matplotlib.image as img
 import wx
 
 class Predictor:
-    def __init__(self, in_queue, out_queue, data, parent_thread, viewer):
+    def __init__(self, in_queue, out_queue, data, parent_thread):
         self.data = data
         self.in_q = in_queue
         self.out_q = out_queue
@@ -21,13 +21,11 @@ class Predictor:
         self.parent = parent_thread
         self.done = False
         self.overlay = ""
-        self.viewer = viewer
     
     def set_done(self, done):
         self.done = done
         
     def run(self):
-        print "predictor running"
         while True:
             if not self.done:
                 self.get_from_queue()
@@ -38,8 +36,8 @@ class Predictor:
         self.current_file = im_file
     
     def get_from_queue(self):
+        '''retrieves from queue and determines correct action based on object received'''
         temp = self.in_q.get()
-        print temp
         print "predictor getting from queue"
         if (self.data.file_dict.has_key(temp)):
             self.current_file = temp
@@ -49,7 +47,7 @@ class Predictor:
             self.predict()
         
     def predict(self):
-        print "prediciting"
+        '''calculates a classification overlay'''
         f_file = self.data.file_dict[self.current_file]
         locs = dict((k,f_file[k]) for k in f_file)
         res= eval(self.rules, locs)
@@ -57,6 +55,7 @@ class Predictor:
                 
                                     
     def make_overlay(self, pred):
+        '''creates the overlay and submits it to the output queue'''
         red = np.zeros_like(pred)
         green = np.zeros_like(pred)
         blue = np.zeros_like(pred)
@@ -69,9 +68,9 @@ class Predictor:
         print "overlay ready"
         #plt.imshow(overlay)
         self.overlay = overlay
-        #self.out_q.put(overlay)
-        self.viewer.Panel.set_array(overlay)
+        self.out_q.put(overlay)
+        '''self.viewer.Panel.set_array(overlay)
         self.viewer.Panel.set_image(overlay)
-        self.viewer.Panel.Refresh()
+        self.viewer.Panel.Refresh()'''
 
 

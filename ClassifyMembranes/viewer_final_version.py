@@ -24,7 +24,9 @@ http://www.daniweb.com/software-development/python/threads/128350/starting-wxpyt
 
 import os
 import sys
+sys.path.append(r'C:\Python27\Lib\site-packages')
 import wx
+import cv2
 import numpy as np
 import numpy.random as rand
 import threading
@@ -157,7 +159,7 @@ class DemoFrame(wx.Frame):
         dlg.Destroy()
 
 
-class DoodleWindow(wx.Window):
+"""class DoodleWindow(wx.Window):
     # colours = ['Black', 'Yellow', 'Red', 'Green', 'Blue', 'Purple', 
     #     'Brown', 'Aquamarine', 'Forest Green', 'Light Blue', 'Goldenrod', 
     #     'Cyan', 'Orange', 'Navy', 'Dark Grey', 'Light Grey']
@@ -300,9 +302,11 @@ class DoodleWindow(wx.Window):
                  (wx.EVT_UPDATE_UI_RANGE, updateUIHandler)]:
             self.Bind(event, handler, id=firstId, id2=lastId)
 
-    # Event handlers:
+    # Event handlers:"""
     
-    """class ImageWindow(wx.Window):
+    
+    
+class ImageWindow(wx.Window):
 
     colours = ['Red', 'Green', 'Blue']
 
@@ -388,12 +392,16 @@ class DoodleWindow(wx.Window):
         # predictor_filename = 'C:/Users/brian/Desktop/ECS_training_data/04_labeled_update_sec.tif_cuda_pred.tif'
         # self.predictor_output = wx.Image( predictor_filename , wx.BITMAP_TYPE_ANY )
        
+        self.image_array = cv2.imread(self.filename)
+        self.predictor_array = []
+        
         self.image = wx.Image( self.filename, wx.BITMAP_TYPE_ANY )  #self.image is original image(wx.Image)
         self.width = self.image.GetWidth()
         self.height = self.image.GetHeight()
         self.image_bmap = self.image.ConvertToBitmap()      # original image
         self.buffer = self.image_bmap
-
+       
+         
         self.dc = wx.MemoryDC()
         self.dc.SelectObject(self.buffer)
         self.dc.SelectObject(wx.NullBitmap) 
@@ -468,39 +476,39 @@ class DoodleWindow(wx.Window):
 
     
         # Receive array from display_input queue
-        self.predictor_array = display_queue.get()
-        print self.predictor_array        
-        image = wx.ImageFromBuffer(w, h, self.predictor_array)
-        self.predictor_output_bmap = image.ConvertToBitmap()    # predictor classifier overlay
-        self.buffer = self.predictor_output_bmap
-        self.dc.SelectObject(self.buffer)
-        self.Refresh()
-        print "ReturnOverlay"
+        while not display_queue.empty():
+            self.predictor_array = display_queue.get()
+        if not self.predictor_array == []:
+        #print self.predictor_array        
+            image = wx.ImageFromBuffer(w, h, self.predictor_array)
+            print np.shape(self.predictor_array)
+            self.predictor_output_bmap = image.ConvertToBitmap()    # predictor classifier overlay
+            self.buffer = self.predictor_output_bmap
+            self.dc.SelectObject(self.buffer)
+            self.Refresh()
+            print "ReturnOverlay"
 
     def onReturnComposite(self, event):
-        # Convert predictor overlay from bitmap to wx.Image
-        self.predictor_overlay_image = wx.ImageFromBitmap (self.predictor_output_bmap)
-
-        # Composite image (image + overlay) generator
-        w = self.width
-        h= self.height
-        self.composite = wx.EmptyImage(w, h)
-        opacity = 0.5
-        for y in xrange(h):
-            for x in xrange(w):
-                r = opacity * self.image.GetRed(x, y) + (1-opacity) * self.predictor_overlay_image.GetRed(x, y)
-                g = opacity * self.image.GetGreen(x, y) + (1-opacity) * self.predictor_overlay_image.GetGreen(x, y)
-                b = opacity * self.image.GetBlue(x, y) + (1-opacity) * self.predictor_overlay_image.GetBlue(x, y)
-                self.composite.SetRGB(x, y, r, g, b)      # assigns RGB values to each pixel
-        self.composite_bmap = self.composite.ConvertToBitmap()      # composite of original image and predictor overlay
-
-        # Display image
-        self.buffer =  self.composite_bmap
-        self.dc.SelectObject(self.buffer)
-        self.Refresh()
-        print "ReturnComposite"
-        """  
-
+        if not self.predictor_array == []:
+            # Convert predictor overlay from bitmap to wx.Image
+            self.predictor_overlay_image = wx.ImageFromBitmap (self.predictor_output_bmap)
+    
+            # Composite image (image + overlay) generator
+            w = self.width
+            h= self.height
+            self.composite = wx.EmptyImage(w, h)
+            opacity = 0.5
+            
+            self.composite_array = (opacity*self.image_array + (1-opacity)*self.predictor_array).astype(np.uint8)
+            print self.composite_array, np.shape(self.composite_array)
+            image = wx.ImageFromBuffer(w, h, self.composite_array)
+            self.composite_bitmap = image.ConvertToBitmap()
+            
+            # Display image
+            self.buffer =  self.composite_bitmap
+            self.dc.SelectObject(self.buffer)
+            self.Refresh()
+            print "ReturnComposite" 
 
     def onLeftDown(self, event):
         ''' Called when the left mouse button is pressed. '''
@@ -550,7 +558,6 @@ class DoodleWindow(wx.Window):
             print item
             training_queue.put(item)
             
-
     def onSize(self, event):
         ''' Called when the window is resized. We set a flag so the idle
             handler will resize the buffer. '''
@@ -605,12 +612,13 @@ class DoodleWindow(wx.Window):
         dc.EndDrawing()
 
 
+
 class DoodleFrame(wx.Frame):
     def __init__(self, parent=None):
         super(DoodleFrame, self).__init__(parent, title="Doodle Frame", 
             size=(1024, 1024), 
             style=wx.DEFAULT_FRAME_STYLE|wx.NO_FULL_REPAINT_ON_RESIZE)
-        doodle = DoodleWindow(self)
+        doodle = ImageWindow(self)
         self.window = doodle
 
 #---------------------------------------------------------------------------------------
@@ -618,8 +626,8 @@ if __name__ == '__main__':
     app = wx.App(False)
     frame = DoodleFrame()
     frame.Show()
-    overlay_frame = DemoFrame()
-    overlay_frame.Show()
+    #overlay_frame = DemoFrame()
+    #overlay_frame.Show()
     #overlay_viewer = ImagePanel(None, None)
 
     
@@ -629,10 +637,10 @@ if __name__ == '__main__':
     display_queue = Queue()
     
     trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test', training_queue, predictor_queue, threading.currentThread())
-    predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread(), overlay_frame)
+    predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread())
     
     #set the number of random features chosen in kitchen sinks
-    trainer.set_num_rand(10)
+    trainer.set_num_rand(1000)
     
     #set the first picture opened (used during testing)
     predictor.set_current_file('C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif')
@@ -645,11 +653,10 @@ if __name__ == '__main__':
     
     training_worker.start()
     predicting_worker.start()
-    print training_worker.isDaemon()
-    print predicting_worker.isDaemon()
 
     app.MainLoop()
     
+    #Force trainer and predictor to stop
     trainer.set_done(True)
     predictor.set_done(True)
     

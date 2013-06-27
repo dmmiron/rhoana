@@ -19,7 +19,6 @@ cdef void _fastdot(unsigned char [:, ::1] D,
 
 def fastdot(D):
     assert (D.dtype == np.bool) or (D.dtype == np.uint8)
-    assert D.shape[1] < D.shape[0]
     out = np.zeros((8, D.shape[1], D.shape[1]), np.uint32)
     _fastdot(D.view(dtype=np.uint8), out)
     out = out.sum(axis=0)

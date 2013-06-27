@@ -23,6 +23,7 @@ class Training_Data:
         self.file_dict = self.make_file_dict()
         
     def make_file_dict(self):
+        '''creates a dictionary with image names as keys to feature files'''
         #contains IMAGE name as key
         file_dict = dict((ea[2],ea[0]) for ea in self.files)
         return file_dict
@@ -52,8 +53,8 @@ class Training_Data:
     #Currently assuming format of line data is [start, end, label, image]
     def update_features(self, lines):
         '''Appends new data from drawn lines to feature and label matrices'''
-        print lines
         self.check_lines(lines)
+        print len(lines)
         num_pixels =0
         tot_pixels = 0
         new_labels = []

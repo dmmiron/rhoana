@@ -30,7 +30,6 @@ class Trainer:
         self.done = done
         
     def run(self):
-        print "trainer running"
         while True:
             if not self.done:
                 self.get_from_queue()
@@ -38,6 +37,7 @@ class Trainer:
                 return
                 
     def get_from_queue(self):
+        '''Gets data from queue and controls flow of training'''
         if (self.in_q.empty()):
             time.sleep(3)
             return True
@@ -60,6 +60,8 @@ class Trainer:
         self.num_rand = num
 
     def train(self):
+        '''Adds current correlation and rhs to previous results then 
+        computes and sends new rules to output queue'''
         featureized_data, new_feature_names = self.featureize(self.data.features, self.data.keys , self.num_rand)
         st = time.time()
         Corr = self.correlation_matrix_NZ(featureized_data, self.num_rand)
@@ -78,7 +80,6 @@ class Trainer:
         # create the rules
         rules = " + ".join(["%f * (%s)" % (w, n) 
                         for w, n in zip(weights, new_feature_names)])
-        print "solved"
         self.out_q.put(rules)
                         
     def featureize(self, D, names, num_new_features):
