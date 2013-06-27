@@ -12,7 +12,7 @@ import matplotlib.image as img
 import wx
 
 class Predictor:
-    def __init__(self, in_queue, out_queue, data, parent_thread, overlay_viewer):
+    def __init__(self, in_queue, out_queue, data, parent_thread, viewer):
         self.data = data
         self.in_q = in_queue
         self.out_q = out_queue
@@ -21,7 +21,7 @@ class Predictor:
         self.parent = parent_thread
         self.done = False
         self.overlay = ""
-        self.viewer = overlay_viewer
+        self.viewer = viewer
     
     def set_done(self, done):
         self.done = done
@@ -69,10 +69,9 @@ class Predictor:
         print "overlay ready"
         #plt.imshow(overlay)
         self.overlay = overlay
+        #self.out_q.put(overlay)
         self.viewer.Panel.set_array(overlay)
         self.viewer.Panel.set_image(overlay)
         self.viewer.Panel.Refresh()
-        #wx.CallAfter(self.viewer.Panel.new_image, overlay)
-        #self.out_q.put(overlay)
 
 

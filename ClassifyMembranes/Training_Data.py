@@ -34,7 +34,6 @@ class Training_Data:
         files = []
         
         for f_file, im_file in zip(feature_file_names, image_file_names):
-            temp_features = []
             f = h5py.File(f_file, 'r')
             files.append([f, f_file, im_file]) #feature_file object, feature_file name, image_file_name
             '''im = cv2.imread(im_file)
@@ -50,8 +49,6 @@ class Training_Data:
         #return np.hstack(features), np.hstack(labels).astype(np.int32), files, files[0][0].keys()
         return features, labels, files, files[0][0].keys()
             
-    
-    
     #Currently assuming format of line data is [start, end, label, image]
     def update_features(self, lines):
         '''Appends new data from drawn lines to feature and label matrices'''
@@ -69,7 +66,8 @@ class Training_Data:
             new_labels += [label]*num_pixels
         
         #append the new pixel labels
-        self.labels = np.hstack((self.labels, new_labels))
+        #self.labels = np.hstack((self.labels, new_labels))
+        self.labels =new_labels
         
         new_features = np.zeros((len(self.keys), tot_pixels))
     
@@ -96,10 +94,11 @@ class Training_Data:
                 offset += len(feat_data)
                 
         #append the new features 
-        if self.features == []:
+        '''if self.features == []:
             self.features = new_features       
         else:
-            self.features = np.hstack((self.features, new_features))
+            self.features = np.hstack((self.features, new_features))'''
+        self.features = new_features
         print np.shape(self.features), np.shape(self.labels)    
         
     def check_lines(self, lines):

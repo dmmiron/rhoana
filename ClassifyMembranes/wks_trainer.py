@@ -22,41 +22,39 @@ class Trainer:
         self.num_rand = 0
         self.parent = parent_thread
         self.done = False
+        self.rhs = None
+        self.corr = None
+        self.first = True
         
     def set_done(self, done):
         self.done = done
         
     def run(self):
-        trained = True
         print "trainer running"
         while True:
             if not self.done:
-                trained = self.get_from_queue(trained)
+                self.get_from_queue()
             else:
                 return
                 
-    def get_from_queue(self, trained):
-        if (self.in_q.empty() and not trained):
-            time.sleep(3)
-            self.train()
-            return True
-        elif (self.in_q.empty()):
+    def get_from_queue(self):
+        if (self.in_q.empty()):
             time.sleep(3)
             return True
         else:
             temp = []
-            timeout = False
             while True:
                 while not self.in_q.empty():
-                    timeout = False
                     temp += [self.in_q.get()]
-                    if len(temp)==1000:
+                    if len(temp)==500:
                         self.data.update_features(temp)
-                        return False
-                time.sleep(5)
+                        self.train()
+                        return
+                time.sleep(3)
                 if self.in_q.empty():
                     self.data.update_features(temp)
-                    return False
+                    self.train()
+                    return
             
     def set_num_rand(self, num):
         self.num_rand = num
@@ -68,7 +66,14 @@ class Trainer:
         print "Correlation took", time.time() - st
         rhs = np.dot(featureized_data.T, (self.data.labels))
         print "solving"
-        weights, residuals, rank, s = np.linalg.lstsq(Corr, rhs)
+        if self.first:
+            self.rhs = rhs
+            self.corr = Corr
+            self.first = False
+        else:
+            self.rhs+=rhs
+            self.corr+=Corr
+        weights, residuals, rank, s = np.linalg.lstsq(self.corr, self.rhs)
 
         # create the rules
         rules = " + ".join(["%f * (%s)" % (w, n) 
