@@ -32,285 +32,14 @@ import numpy.random as rand
 import threading
 from Queue import Queue
 import wks_predictor as predictor
-import wks_trainer as trainer
-
-
-class ImagePanel(wx.Panel):
-    """ 
-    A very simple panel for displaying a wx.Image
-    """
-    def __init__(self, image, arr, *args, **kwargs):
-        wx.Panel.__init__(self, *args, **kwargs)
-        
-        self.image = image
-        self.arr = arr
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-
-    def set_array(self, array):
-        self.arr = array
-        self.Refresh()
-        
-    def set_image(self, array):
-        image = wx.ImageFromBuffer(np.shape(array)[0], np.shape(array)[1], array)
-        self.image = image 
-        self.Refresh()
-         
-    def new_image(self, array):
-        self.arr = array
-        self.Refresh()
-    def OnPaint(self, event):
-        dc = wx.PaintDC(self)
-        dc.DrawBitmap(wx.BitmapFromImage(self.image), 0, 0)
-        
-
-class DemoFrame(wx.Frame):
-    """ This window displays a button """
-    def __init__(self, title = "Micro App"):
-        wx.Frame.__init__(self, None , -1, title)
-
-        MenuBar = wx.MenuBar()
-        FileMenu = wx.Menu()
-
-        item = FileMenu.Append(wx.ID_ANY, text = "&Open")
-        self.Bind(wx.EVT_MENU, self.OnOpen, item)
-
-        item = FileMenu.Append(wx.ID_PREFERENCES, text = "&Preferences")
-        self.Bind(wx.EVT_MENU, self.OnPrefs, item)
-
-        item = FileMenu.Append(wx.ID_EXIT, text = "&Exit")
-        self.Bind(wx.EVT_MENU, self.OnQuit, item)
-
-        MenuBar.Append(FileMenu, "&File")
-        
-        HelpMenu = wx.Menu()
-
-        item = HelpMenu.Append(wx.ID_HELP, "Test &Help",
-                                "Help for this simple test")
-        self.Bind(wx.EVT_MENU, self.OnHelp, item)
-
-        ## this gets put in the App menu on OS-X
-        item = HelpMenu.Append(wx.ID_ABOUT, "&About",
-                                "More information About this program")
-        self.Bind(wx.EVT_MENU, self.OnAbout, item)
-        MenuBar.Append(HelpMenu, "&Help")
-
-        self.SetMenuBar(MenuBar)
-
-        btn = wx.Button(self, label = "NewImage")
-        btn.Bind(wx.EVT_BUTTON, self.OnNewImage )
-
-        self.Bind(wx.EVT_CLOSE, self.OnQuit)
-
-        ##Create numpy array, and image from it
-        w = h = 1000
-        self.array = rand.randint(0, 255, (h, w, 3)).astype('uint8')
-        print self.array
-        image = wx.ImageFromBuffer(w, h, self.array)
-        #image = wx.Image("Images/cute_close_up.jpg")
-        self.Panel = ImagePanel(image, self.array, self)
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(btn, 0, wx.ALIGN_CENTER|wx.ALL, 5)
-        sizer.Add(self.Panel, 1, wx.GROW)
-        
-        self.SetSizer(sizer)
-
-    def new_image(self, array):
-        self.array = array
-        self.Panel.Refresh()
-        
-    def OnNewImage(self, array, event = None):
-        """
-        create a new image by changing underlying numpy array
-        """
-        self.array = array
-        self.Panel.Refresh()
-        
-        
-    def OnQuit(self,Event):
-        self.Destroy()
-        
-    def OnAbout(self, event):
-        dlg = wx.MessageDialog(self, "This is a small program to test\n"
-                                     "the use of menus on Mac, etc.\n",
-                                "About Me", wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    def OnHelp(self, event):
-        dlg = wx.MessageDialog(self, "This would be help\n"
-                                     "If there was any\n",
-                                "Test Help", wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    def OnOpen(self, event):
-        dlg = wx.MessageDialog(self, "This would be an open Dialog\n"
-                                     "If there was anything to open\n",
-                                "Open File", wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    def OnPrefs(self, event):
-        dlg = wx.MessageDialog(self, "This would be an preferences Dialog\n"
-                                     "If there were any preferences to set.\n",
-                                "Preferences", wx.OK | wx.ICON_INFORMATION)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-
-"""class DoodleWindow(wx.Window):
-    # colours = ['Black', 'Yellow', 'Red', 'Green', 'Blue', 'Purple', 
-    #     'Brown', 'Aquamarine', 'Forest Green', 'Light Blue', 'Goldenrod', 
-    #     'Cyan', 'Orange', 'Navy', 'Dark Grey', 'Light Grey']
-    colours = ['Red', 'Green', 'Blue']
-
-    # thicknesses = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128]
-    thicknesses = [1, 2, 3, 4]
-
-    def __init__(self, parent):
-        super(DoodleWindow, self).__init__(parent, 
-            style=wx.NO_FULL_REPAINT_ON_RESIZE)
-        self.initDrawing()
-        self.makeMenu()
-        self.bindEvents()
-        self.initBuffer()
-        
-    def initDrawing(self):
-        # self.SetBackgroundColour('WHITE')
-        self.currentThickness = self.thicknesses[0] 
-        self.currentColour = self.colours[0]
-        self.lines = []
-        self.previousPosition = (0, 0)
-        self.filename = 'C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif' 
-
-
-    def bindEvents(self):
-
-        # keystroke_original_img = wx.NewId()
-        # keystroke_overlay_img = wx.NewId()
-
-        # # forward_key = wx.NewId()
-        # # back_key = wx.NewId()
-        
-        # self.accel_tbl = wx.AcceleratorTable([(wx.ACCEL_NORMAL, ord('I'), keystroke_original_img,
-        #                                         wx.ACCEL_NORMAL, ord('O'), keystroke_overlay_img,
-        #                                     # wx.ACCEL_NORMAL, ord('A'), back_key),
-        #                                     #   (wx.ACCEL_NORMAL, ord('D'), forward_key)                              
-        #                                      )])
-        # self.SetAcceleratorTable(self.accel_tbl)
-
-
-        # # Event bindings--
-        # self.Bind(wx.EVT_MENU, self.onImageKey, id=keystroke_original_img)
-        # self.Bind(wx.EVT_MENU, self.onOverlayKey, id=keystroke_overlay_img)
-        # # self.Bind(wx.EVT_MENU, self.onForwardKey, id=forward_key)
-        # # self.Bind(wx.EVT_MENU, self.onBackKey, id=back_key)
-
-        for event, handler in [ \
-                (wx.EVT_LEFT_DOWN, self.onLeftDown), # Start drawing
-                (wx.EVT_LEFT_UP, self.onLeftUp),     # Stop drawing 
-                (wx.EVT_MOTION, self.onMotion),      # Draw
-                (wx.EVT_RIGHT_UP, self.onRightUp),   # Popup menu
-                (wx.EVT_SIZE, self.onSize),          # Prepare for redraw
-                (wx.EVT_IDLE, self.onIdle),          # Redraw
-                (wx.EVT_PAINT, self.onPaint),        # Refresh
-                (wx.EVT_WINDOW_DESTROY, self.cleanup)]:
-            self.Bind(event, handler)
-
-    def initBuffer(self):
-        ''' Initialize the bitmap used for buffering the display. '''
-        size = self.GetClientSize()
-        graphicFilename = 'C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif' 
-        #'C:/Documents and Settings/Brian Baek/Desktop/py files/ECS_training_data/04_labeled_update_sec.tif'
-        predictor_filename = 'C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif'
-        self.predictor_output = wx.Image( predictor_filename , wx.BITMAP_TYPE_ANY )
-        self.image = wx.Image( graphicFilename, wx.BITMAP_TYPE_ANY )
-
-        width = self.image.GetWidth()
-        height = self.image.GetHeight()
-        self.buffer = wx.EmptyImage(width, height)
-
-        opacity = 0.5
-        for y in xrange(height):
-            for x in xrange(width):
-                r = opacity * self.image.GetRed(x, y) + (1-opacity) * self.predictor_output.GetRed(x, y)
-                g = opacity * self.image.GetGreen(x, y) + (1-opacity) * self.predictor_output.GetGreen(x, y)
-                b = opacity * self.image.GetBlue(x, y) + (1-opacity) * self.predictor_output.GetBlue(x, y)
-                self.buffer.SetRGB(x, y, r, g, b)
-        self.buffer = self.buffer.ConvertToBitmap()
-
-        # self.buffer = wx.Bitmap("C:/Documents and Settings/Brian Baek/Desktop/py files/ECS_training_data/04_labeled_update_sec.tif")
-
-
-        # self.buffer = wx.EmptyBitmap(size.width, size.height)
-        # dc = wx.BufferedDC(None, self.buffer)
-
-        dc = wx.MemoryDC()
-        dc.SelectObject(self.buffer)
-        dc.SelectObject(wx.NullBitmap) 
-        # dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
-        dc.Clear()
-        self.drawLines(dc, *self.lines)
-        self.reInitBuffer = False
-
-
-    def onPaint(self, event):
-        ''' Called when the window is exposed. '''
-        # Create a buffered paint DC.  It will create the real
-        # wx.PaintDC and then blit the bitmap to it when dc is
-        # deleted.  Since we don't need to draw anything else
-        # here that's all there is to it.
-        dc = wx.BufferedPaintDC(self, self.buffer)  
-
-
-
-    def makeMenu(self):
-        ''' Make a menu that can be popped up later. '''
-        self.menu = wx.Menu()
-        self.idToColourMap = self.addCheckableMenuItems(self.menu, 
-            self.colours)
-        self.bindMenuEvents(menuHandler=self.onMenuSetColour,
-            updateUIHandler=self.onCheckMenuColours,
-            ids=self.idToColourMap.keys())
-        self.menu.Break() # Next menu items go in a new column of the menu
-        self.idToThicknessMap = self.addCheckableMenuItems(self.menu,
-            self.thicknesses)
-        self.bindMenuEvents(menuHandler=self.onMenuSetThickness,
-            updateUIHandler=self.onCheckMenuThickness,
-            ids=self.idToThicknessMap.keys())
-
-    @staticmethod
-    def addCheckableMenuItems(menu, items):
-        ''' Add a checkable menu entry to menu for each item in items. This
-            method returns a dictionary that maps the menuIds to the
-            items. '''
-        idToItemMapping = {}
-        for item in items:
-            menuId = wx.NewId()
-            idToItemMapping[menuId] = item
-            menu.Append(menuId, str(item), kind=wx.ITEM_CHECK)
-        return idToItemMapping
-
-    def bindMenuEvents(self, menuHandler, updateUIHandler, ids): 
-        ''' Bind the menu id's in the list ids to menuHandler and
-            updateUIHandler. ''' 
-        sortedIds = sorted(ids)
-        firstId, lastId = sortedIds[0], sortedIds[-1]
-        for event, handler in \
-                [(wx.EVT_MENU_RANGE, menuHandler),
-                 (wx.EVT_UPDATE_UI_RANGE, updateUIHandler)]:
-            self.Bind(event, handler, id=firstId, id2=lastId)
-
-    # Event handlers:"""
-    
+import wks_trainer as trainer    
     
     
 class ImageWindow(wx.Window):
 
     colours = ['Red', 'Green', 'Blue']
 
-    thicknesses = [1, 2, 4]
+    thicknesses = [1,3,5,7,9,15,25,55]
 
     def __init__(self, parent):
 
@@ -336,7 +65,8 @@ class ImageWindow(wx.Window):
         self.previousPosition = (0, 0)
 
         # CHANGE FILENAME TO LOCAL FILE!!
-        self.filename = 'C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif' 
+        self.filename = 'C:\\Users\\DanielMiron\\Documents\\test\\sec004.tif'
+        self.output_filename =  'C:\\Users\\DanielMiron\\Documents\\test\\sec004_new.tif'
         # "C:/Documents and Settings/Brian Baek/Desktop/py files/ECS_training_data/04_labeled_update_sec.tif")
         self.opacity = 0.5  # opacity level for initBuffer()
 
@@ -349,12 +79,15 @@ class ImageWindow(wx.Window):
         key_original_img = wx.NewId()
         key_overlay_img = wx.NewId()
         key_composite_img = wx.NewId()
+        key_save = wx.NewId()
+        key_fixed_line = wx.NewId() #for testing a set line segment
         # forward_key = wx.NewId()
         # back_key = wx.NewId()
         
         self.accel_tbl = wx.AcceleratorTable([(wx.ACCEL_NORMAL, ord('W'), key_original_img), 
             (wx.ACCEL_NORMAL, ord('E'), key_overlay_img),
-            (wx.ACCEL_NORMAL, ord('R'), key_composite_img)])
+            (wx.ACCEL_NORMAL, ord('R'), key_composite_img), (wx.ACCEL_NORMAL, ord('S'), key_save), 
+            (wx.ACCEL_NORMAL, ord('L'), key_fixed_line)])
             # (wx.ACCEL_NORMAL, ord('D'), forward_key)])
                                             #   (wx.ACCEL_NORMAL, ord('D'), forward_key)                              
         self.SetAcceleratorTable(self.accel_tbl)
@@ -363,6 +96,8 @@ class ImageWindow(wx.Window):
         self.Bind(wx.EVT_MENU, self.onReturnImage, id=key_original_img)
         self.Bind(wx.EVT_MENU, self.onReturnOverlay, id=key_overlay_img)
         self.Bind(wx.EVT_MENU, self.onReturnComposite, id=key_composite_img)
+        self.Bind(wx.EVT_MENU, self.onSaveImage, id=key_save)
+        self.Bind(wx.EVT_MENU, self.onFixedLine, id=key_fixed_line)
 
 
         # self.Bind(wx.EVT_MENU, self.nextPicture, id=forward_key)
@@ -393,6 +128,12 @@ class ImageWindow(wx.Window):
         # self.predictor_output = wx.Image( predictor_filename , wx.BITMAP_TYPE_ANY )
        
         self.image_array = cv2.imread(self.filename)
+        
+        #convert to RGB instead of BGR
+        temp = self.image_array[:,:, 0]
+        self.image_array[:,:,0] = self.image_array[:,:,2]
+        self.image_array[:,:,2] = temp
+        
         self.predictor_array = []
         
         self.image = wx.Image( self.filename, wx.BITMAP_TYPE_ANY )  #self.image is original image(wx.Image)
@@ -410,7 +151,19 @@ class ImageWindow(wx.Window):
         self.drawLines(self.dc, *self.lines)
         self.reInitBuffer = False
 
-
+    def onSaveImage(self, event):
+        print "saving"
+        #wx.Image.SaveMimeFile(self.image, self.output_filename, "image/tiff")
+        self.buffer.SaveFile(self.output_filename, wx.BITMAP_TYPE_TIF)
+        
+    def onFixedLine(self, event):
+        line = ('Red', 3, [(250,500, 260, 480)])
+        dc = wx.BufferedDC(wx.ClientDC(self), self.buffer)
+        self.drawLines(dc, line)
+        self.buffer.SaveFile(self.filename, wx.BITMAP_TYPE_TIF)
+        #item = [lineSegment[:2], lineSegment[2:], self.colorcode, self.currentThickness, self.filename]
+        training_queue.put([[500,500], [525,525], 0, 3, self.filename])
+        
     def onPaint(self, event):
         ''' Called when the window is exposed. '''
         # Create a buffered paint DC.  It will create the real
@@ -463,6 +216,7 @@ class ImageWindow(wx.Window):
         self.buffer = self.image_bmap
         self.dc.SelectObject(self.buffer)
         self.Refresh()      # changes display image on wx.Window
+        self.output_filename = 'C:\\Users\\DanielMiron\\Documents\\test\\sec004_new.tif'
         print "ReturnImage"
 
     # Receive predictor overlay from queue, then display
@@ -486,6 +240,7 @@ class ImageWindow(wx.Window):
             self.buffer = self.predictor_output_bmap
             self.dc.SelectObject(self.buffer)
             self.Refresh()
+            self.output_filename = 'C:\\Users\\DanielMiron\\Documents\\test\\sec004_overlay.tif'
             print "ReturnOverlay"
 
     def onReturnComposite(self, event):
@@ -500,7 +255,6 @@ class ImageWindow(wx.Window):
             opacity = 0.5
             
             self.composite_array = (opacity*self.image_array + (1-opacity)*self.predictor_array).astype(np.uint8)
-            print self.composite_array, np.shape(self.composite_array)
             image = wx.ImageFromBuffer(w, h, self.composite_array)
             self.composite_bitmap = image.ConvertToBitmap()
             
@@ -554,7 +308,7 @@ class ImageWindow(wx.Window):
 
 
             # place line coordinates, color label, and filename in job_queue
-            item = [lineSegment[:2], lineSegment[2:], self.colorcode, self.filename]  
+            item = [lineSegment[:2], lineSegment[2:], self.colorcode, self.currentThickness, self.filename]  
             print item
             training_queue.put(item)
             
@@ -636,14 +390,13 @@ if __name__ == '__main__':
     predictor_queue =Queue()
     display_queue = Queue()
     
-    trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test', training_queue, predictor_queue, threading.currentThread())
+    num_rand = 1000
+    trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test',
+                            training_queue, predictor_queue, threading.currentThread(), num_rand)
     predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread())
     
-    #set the number of random features chosen in kitchen sinks
-    trainer.set_num_rand(1000)
-    
     #set the first picture opened (used during testing)
-    predictor.set_current_file('C:\\Users\\DanielMiron\\Documents\\test\\04_labeled_update_sec.tif')
+    predictor.set_current_file('C:\\Users\\DanielMiron\\Documents\\test\\sec004.tif')
     
     training_worker = threading.Thread(target = trainer.run, name = "trainer")
     predicting_worker = threading.Thread(target = predictor.run, name = "predictor")
@@ -656,6 +409,7 @@ if __name__ == '__main__':
 
     app.MainLoop()
     
+    trainer.data.close_files()
     #Force trainer and predictor to stop
     trainer.set_done(True)
     predictor.set_done(True)
