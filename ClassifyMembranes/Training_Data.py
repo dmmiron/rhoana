@@ -12,10 +12,10 @@ import glob
 import cv2
 import numpy as np
 import warnings
+
 import random
 from collections import defaultdict
 from skimage import morphology as sk
-
 import gc
 
 
@@ -240,4 +240,4 @@ class Training_Data:
         for file in self.files:
             file[0].close()
             
-#data = Training_Data("C:\\Users\\DanielMiron\\Documents\\test", 1000)
+
