@@ -64,6 +64,7 @@ __global__ void predictKernel(const float *x, int n, int mdim, const int *treema
 }
 """
 
+
 #forest_file = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\rhoana_forest_3class.hdf5'
 #input_image_folder = 'D:\\dev\\Rhoana\\classifierTraining\\Miketraining\\all'
 #input_image_suffix = '_labeled.png'
