@@ -11,7 +11,7 @@ import glob
 import cv2
 import numpy as np
 import warnings
-import train_gpu_randomforest as forest
+# import train_gpu_randomforest as forest
 import gc
 
 
@@ -126,4 +126,5 @@ class Training_Data:
         for file in self.files:
             file[0].close()
             
-#data = Training_Data("C:\\Users\\DanielMiron\\Documents\\test")
+data = Training_Data("C:\\Users\\brian\\Documents\\Images")
+data.check_lines()
