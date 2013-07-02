@@ -9,15 +9,15 @@ import glob
 
 sys.path.append('C:\Python27\Lib\site-packages')
 import cv2
-# import wks_predictor as predictor
-# import wks_trainer as trainer
+import wks_predictor as predictor
+import wks_trainer as trainer
 
 
 class ImageWindow(wx.Window):
 
     colours = ['Red', 'Green', 'Blue']
 
-    thicknesses = [1, 2, 3, 4]
+    thicknesses = [1,3,5,7,9]
 
     def __init__(self, parent):
         super(ImageWindow, self).__init__(parent, style=wx.NO_FULL_REPAINT_ON_RESIZE) 
@@ -53,6 +53,7 @@ class ImageWindow(wx.Window):
         self.lines = []
         self.previousPosition = (0, 0)
         self.filename = self.file_list[0]
+        predictor_queue.put(self.filename)
         # "C:\\Documents and Settings\\Brian Baek\\Desktop\\py files\\ECS_training_data\\04_labeled_update_sec.tif")
 
 
@@ -61,15 +62,22 @@ class ImageWindow(wx.Window):
     def initBuffer(self):
         ''' Initialize the bitmap used for buffering the display. '''
         size = self.GetClientSize()
+        self.image_arrays = []
+        self.bitmaps = []
+        for im in self.file_list:
+            self.image_arrays.append(cv2.imread(im))
+            image = wx.Image(im, wx.BITMAP_TYPE_ANY)
+            self.bitmaps.append(image.ConvertToBitmap())
+            
         self.image_array = cv2.imread(self.filename)
         self.predictor_array = []
 
-        # images are loaded into self.buffer;   
-        self.image = wx.Image( self.filename, wx.BITMAP_TYPE_ANY ) #self.image is original image(wx.Image)
-        self.width = self.image.GetWidth()
-        self.height = self.image.GetHeight()
-        self.image_bmap = self.image.ConvertToBitmap() # original image
-        self.buffer = self.image_bmap
+        # get height and width of images (assumes all are same size)   
+        self.width = image.GetWidth() 
+        self.height = image.GetHeight()
+        
+        #load first image into buffer
+        self.buffer = self.bitmaps[self.file_index]
        
         self.dc = wx.MemoryDC()
         self.dc.SelectObject(self.buffer)
@@ -170,7 +178,7 @@ class ImageWindow(wx.Window):
     #-----
     # Switch display image events
     def onReturnImage(self, event):
-        self.buffer = self.image_bmap
+        self.buffer = self.bitmaps[self.file_index]
         self.dc.SelectObject(self.buffer)
         self.Refresh()      # changes display image on wx.Window
         print "ReturnImage"
@@ -179,7 +187,7 @@ class ImageWindow(wx.Window):
     def onReturnOverlay(self, event):
         w = self.width
         h= self.height
-          
+        print "overlay"  
         # Receive array from display_input queue
         while not display_queue.empty():
             self.predictor_array = display_queue.get()
@@ -194,6 +202,8 @@ class ImageWindow(wx.Window):
 
 
     def onReturnComposite(self, event):
+        while not display_queue.empty():
+            self.predictor_array = display_queue.get()
         if not self.predictor_array == []:
             # Convert predictor overlay from bitmap to wx.Image
             self.predictor_overlay_image = wx.ImageFromBitmap (self.predictor_output_bmap)
@@ -203,13 +213,13 @@ class ImageWindow(wx.Window):
             h= self.height
             self.composite = wx.EmptyImage(w, h)
             self.opacity = 0.5
-            self.composite_array = (opacity*self.image_array + (1-opacity)*self.predictor_array).astype(np.uint8)
-            print self.composite_array, np.shape(self.composite_array)
+            self.composite_array = (self.opacity*self.image_arrays[self.file_index] 
+                                    + (1-self.opacity)*self.predictor_array).astype(np.uint8)
             image = wx.ImageFromBuffer(w, h, self.composite_array)
-            self.composite_bitmap = image.ConvertToBitmap()
+            composite_bitmap = image.ConvertToBitmap()
             
             # Display image
-            self.buffer = self.composite_bitmap
+            self.buffer = composite_bitmap
             self.dc.SelectObject(self.buffer)
             self.Refresh()
             print "ReturnComposite" 
@@ -222,8 +232,7 @@ class ImageWindow(wx.Window):
         else:
             self.file_index +=1
         image = self.file_list[self.file_index]
-        bmp = wx.Image(image, wx.BITMAP_TYPE_ANY).ConvertToBitmap()
-        self.buffer = bmp
+        self.buffer = self.bitmaps[self.file_index]
         self.dc.SelectObject(self.buffer)
         self.Refresh()  
         print "Viewing: %s" % image
@@ -238,8 +247,7 @@ class ImageWindow(wx.Window):
             self.file_index -=1
 
         image = self.file_list[self.file_index]
-        bmp = wx.Image(image, wx.BITMAP_TYPE_ANY).ConvertToBitmap()
-        self.buffer = bmp
+        self.buffer = self.bitmaps[self.file_index]
         self.dc.SelectObject(self.buffer)
         self.Refresh()  
         print "Viewing: %s" % image
@@ -291,7 +299,7 @@ class ImageWindow(wx.Window):
                 self.colorcode = 2
 
             # place line coordinates, color label, and filename in training_queue
-            item = [lineSegment[:2], lineSegment[2:], self.colorcode, self.filename]  
+            item = [lineSegment[:2], lineSegment[2:], self.colorcode, self.currentThickness, self.filename]  
             print item
             training_queue.put(item)
             
@@ -443,7 +451,11 @@ class ImageFrame(wx.Frame):
         self.Close()
 
     def onSaveLines(self, event):
-        print "make save and load lines functions"
+        dialog = wx.FileDialog(self, "Save file as:", style= wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        if dialog.ShowModal() ==wx.ID_CANCEL:
+            return
+        output = dialog.GetPath()
+        self.sketch.buffer.SaveFile(output, wx.BITMAP_TYPE_TIF)
 
     def onLoadLines(self, event):
         print "make save and load lines functions"
@@ -478,27 +490,24 @@ if __name__ == '__main__':
     predictor_queue =Queue()
     display_queue = Queue()
     
-    # trainer = trainer.Trainer('C:\\Users\\brian\\Documents\\Images', training_queue, predictor_queue, threading.currentThread())
-    # predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread())
-    
-    # #set the number of random features chosen in kitchen sinks
-    # trainer.set_num_rand(500)
+    num_rand = 1000
+    trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test', training_queue, predictor_queue, threading.currentThread(), num_rand)
+    predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread())
     
     # # #set the first picture opened (used during Imagesing)
-    # predictor.set_current_file('C:\\Users\\brian\\Documents\\Images\\04_labeled_update_sec.tif')
     
-    # training_worker = threading.Thread(target = trainer.run, name = "trainer")
-    # predicting_worker = threading.Thread(target = predictor.run, name = "predictor")
-    
-    # training_worker.daemon = True
-    # predicting_worker.daemon = True
-    
-    # training_worker.start()
-    # predicting_worker.start()
+    training_worker = threading.Thread(target = trainer.run, name = "trainer")
+    predicting_worker = threading.Thread(target = predictor.run, name = "predictor")
+
+    training_worker.daemon = True
+    predicting_worker.daemon = True
+
+    training_worker.start()
+    predicting_worker.start()
 
     app.MainLoop()
     
     #Force trainer and predictor to stop
-    # trainer.set_done(True)
-    # predictor.set_done(True)
+    trainer.set_done(True)
+    predictor.set_done(True)
     

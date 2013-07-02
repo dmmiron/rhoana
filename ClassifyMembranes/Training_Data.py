@@ -64,7 +64,7 @@ class Training_Data:
         for f_file, im_file in zip(feature_file_names, image_file_names):
             f = h5py.File(f_file, 'r+')
             files.append([f, f_file, im_file]) #feature_file object, feature_file name, image_file_name
-            im = cv2.imread(im_file)
+            '''im = cv2.imread(im_file)
             mask2 = im[:, :, 0] > np.maximum(im[:, :, 1], im[:, :, 2])
             mask1 = im[:, :, 1] > np.maximum(im[:, :, 0], im[:, :, 2])
             mask0 = im[:, :, 2] > np.maximum(im[:, :, 0], im[:, :, 1])
@@ -75,8 +75,8 @@ class Training_Data:
                 temp_features.append(f[feature][...][mask_all].astype(np.float32))
             features.append(np.vstack(temp_features))
             print "files " + f_file + ", " + im_file + " read"
-        return np.hstack(features), np.hstack(labels).astype(np.int32), files, files[0][0].keys()
-        #return features, labels, files, files[0][0].keys()
+        return np.hstack(features), np.hstack(labels).astype(np.int32), files, files[0][0].keys()'''
+        return features, labels, files, files[0][0].keys()
             
     #Currently assuming format of line data is [start, end, label, image]
     """def update_features(self, lines):
@@ -221,7 +221,7 @@ class Training_Data:
             idx_mat[idx_number,0] = idx
             file_num = np.random.choice(range(len(self.files))) #choose a random file
             row = np.random.randint(self.im_shape[0]) #choose a random row of the image
-            thresh = np.random.choice(self.files[0][file_num][self.keys[idx]][row]) #choose from the row
+            thresh = np.random.choice(self.files[file_num][0][self.keys[idx]][row]) #choose from the row
             idx_mat[idx_number,1] = thresh
         return idx_mat
         
