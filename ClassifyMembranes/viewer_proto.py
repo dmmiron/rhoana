@@ -10,7 +10,7 @@ import glob
 sys.path.append('C:\Python27\Lib\site-packages')
 import cv2
 import wks_predictor as predictor
-import wks_trainer as trainer
+import main_trainer as trainer
 
 
 class ImageWindow(wx.Window):
@@ -477,21 +477,19 @@ class ImageFrame(wx.Frame):
 
 #---------------------------------------------------------------------------------------
 if __name__ == '__main__':
-    app = wx.App(False)
-    frame = ImageFrame()
-    frame.Show()
-    #overlay_frame = DemoFrame()
-    #overlay_frame.Show()
-    #overlay_viewer = ImagePanel(None, None)
-
-    
-    # Create job queue and thread
     training_queue = Queue()
     predictor_queue =Queue()
     display_queue = Queue()
     
-    num_rand = 1000
-    trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test', training_queue, predictor_queue, threading.currentThread(), num_rand)
+    app = wx.App(False)
+    frame = ImageFrame()
+    frame.Show()
+  
+    num_rand = 10
+    num_bins = 1
+    bin_size = 3000
+    trainer = trainer.Trainer('C:\\Users\\DanielMiron\\Documents\\test', training_queue,
+                                predictor_queue, threading.currentThread(), num_rand, num_bins, bin_size)
     predictor = predictor.Predictor(predictor_queue, display_queue, trainer.data, threading.currentThread())
     
     # # #set the first picture opened (used during Imagesing)

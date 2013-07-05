@@ -77,60 +77,7 @@ class Training_Data:
             print "files " + f_file + ", " + im_file + " read"
         return np.hstack(features), np.hstack(labels).astype(np.int32), files, files[0][0].keys()'''
         return features, labels, files, files[0][0].keys()
-            
-    #Currently assuming format of line data is [start, end, label, image]
-    """def update_features(self, lines):
-        '''Appends new data from drawn lines to feature and label matrices'''
-        self.check_lines(lines)
-        print len(lines)
-        num_pixels =0
-        tot_pixels = 0
-        new_labels = []
-        for idx, (start, end, label, feature_file) in enumerate(lines):
-            xdist = np.abs(start[0]-end[0])
-            ydist = np.abs(start[1]-end[1])
-            num_pixels=max(xdist, ydist)
-            tot_pixels+=num_pixels
-            #Expand the new labels from lines to pixels
-            new_labels += [label]*num_pixels
-        
-        #append the new pixel labels
-        #self.labels = np.hstack((self.labels, new_labels))
-        self.labels =new_labels
-        
-        new_features = np.zeros((len(self.keys), tot_pixels))
-    
-        for idx, feature in enumerate(self.keys):
-            offset = 0
-            for start, end, label, feature_file in lines:
-                f_file = self.file_dict[feature_file]
-                #Get region of interest
-                mini = min(start[0], end[0])
-                maxi = max(start[0], end[0])
-                minj = min(start[1], end[1])
-                maxj = max(start[1], end[1])
-                roi  = f_file[feature][mini:maxi+1, minj:maxj+1][...]
-                
-                #Get indices of pixels in line
-                steps = max(maxi-mini+1, maxj-minj+1) #num pixels is size of larger dimension +1
-                icoords = np.linspace(start[0]-mini, end[0]-mini, steps)[:-1]
-                icoords = np.round(icoords).astype(np.int32)
-                jcoords = np.linspace(start[1]-minj, end[1]-minj, steps)[:-1]
-                jcoords = np.round(jcoords).astype(np.int32)
-                #add the data for current line to feature array
-                feat_data = roi[icoords, jcoords]
-                new_features[idx, offset:offset+len(feat_data)] = feat_data
-                offset += len(feat_data)
-                
-        #append the new features 
-        '''if self.features == []:
-            self.features = new_features       
-        else:
-            self.features = np.hstack((self.features, new_features))'''
-        self.features = new_features
-        print np.shape(self.features), np.shape(self.labels)   """ 
-        
-        
+           
     def update_features(self, lines):
         print "updating"
         lines = self.check_lines(lines)
