@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;spinning_box/main_2.html&apos; to &apos;main.html&apos;" description="Rename resource &apos;main_2.html&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="main_2.html" name="main.html" stamp="1376573125320" updateReferences="true"/>
+</session>

@@ -1,0 +1,577 @@
+
+<!DOCTYPE html>
+<!--
+/*
+ * Copyright (C) 2009 Apple Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ -->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Spinning WebGL Box</title>
+
+<script src="resources/J3DI.js"> </script>
+<script src="resources/J3DIMath.js" type="text/javascript"></script>
+<script src="o3d-webgl/base.js" type = "text/javascript"></script>
+<script src="o3djs/base.js" type = "text/javascript"></script>
+
+<input type="file" id="fileinput"/>
+
+<script type ="text/javascript" id = "o3dscript">
+//This script copied from arcball example-have not gone through process of removing unnecessary pieces
+o3djs.base.o3d = o3d;
+o3djs.require('o3djs.webgl');
+o3djs.require('o3djs.util');
+o3djs.require('o3djs.math');
+o3djs.require('o3djs.quaternions');
+o3djs.require('o3djs.rendergraph');
+o3djs.require('o3djs.pack');
+o3djs.require('o3djs.arcball');
+o3djs.require('o3djs.scene');
+
+var g_root;
+var g_o3d;
+var g_math;
+var g_quaternions;
+var g_client;
+var g_aball;
+var g_thisRot;
+var g_lastRot;
+var g_rotMat;
+
+var g_pack = null;
+var g_mainPack;
+var g_viewInfo;
+var g_lightPosParam;
+var g_loadingElement;
+var g_o3dWidth = -1;
+var g_o3dHeight = -1;
+var g_o3dElement;
+var g_finished = false;  // for selenium
+
+var g_camera = {
+		  farPlane: 5000,
+		  nearPlane:0.1
+		};
+
+var g_dragging = false;
+
+function startDragging(e) {
+	g_lastRot = g_thisRot;
+
+	g_aball.click([e.x, e.y]);
+
+	g_dragging = true;
+}
+
+function drag(e) {
+	  if (g_dragging) {
+	    var rotationQuat = g_aball.drag([e.x, e.y]);
+	    var rot_mat = g_quaternions.quaternionToRotation(rotationQuat);
+	    g_thisRot = g_math.matrix4.mul(g_lastRot, rot_mat);
+	    g_thisRot = g_math.matrix4.mul(g_thisRot, rot_mat);
+	    drawPicture(gl, true);
+	  }
+	}
+
+function stopDragging(e) {
+	g_dragging = false;
+	
+}
+
+
+function enableInput(enable) {
+	  document.getElementById("url").disabled = !enable;
+	  document.getElementById("load").disabled = !enable;
+}
+</script>
+
+
+
+<script type="text/javascript">
+  var g_arcball;
+  function formatContours(contours, gl) {
+	  //read in contours from file and update the buffer data
+	  //expected format is color followed by vertices and normals. slices are newline delimited, tristrips are tab delimited
+	  
+	  var color = new Array(); //color of contour
+	  var splitStr = contours.split("\n");
+	  splitStr.pop();
+	  color = splitStr.shift();
+	  color = color.substring(1, color.length-2);
+	  whiteSpace = new RegExp("\\s+");
+	  color = color.split(whiteSpace);
+	  while (color[0] == "")
+	  	color.shift();
+	  var vertices;
+	  var normals;
+	  gl.numContours++; //used to index contours
+	  gl[gl.numContours] = {}
+	  gl[gl.numContours].numTriangles = 0;
+	  
+	  for (var i = 0; i<splitStr.length; i+=2)
+	  {
+		  //loop through each slice and update the buffers
+		  var offset = 0;
+		  vertexArray = new Array();
+		  normalArray = new Array();
+		  cnts = splitStr[i].split("\t");
+		  cntNorms = splitStr[i+1].split("\t");
+		  for (var j=0; j<cnts.length; j++)
+		  {	  
+		      vertices = cnts[j].split(whiteSpace);
+		      normals = cntNorms[j].split(whiteSpace);
+		      while (vertices[0] == "")
+		      {
+			      vertices.shift()
+		      }
+		      while (normals[0] == "")
+		      {
+		    	  normals.shift()
+		      }
+		      if (j>0)
+		      {
+		    	  for (var l = 0; l<3; l++)
+			      {
+			    	//create a degenerate triangle to separate disjoint sections
+			      	vertexArray[offset+l] = vertices[l]; //copy first vertex
+			      	normalArray[offset+l] = normals[l];
+			      }
+			      offset +=3;
+		      }
+		      for (var k = 0; k<vertices.length-1; k++) //go to -1 because extra whitespace split occurs at end of string
+		      {  
+		          vertexArray[offset] = vertices[k];
+			      normalArray[offset] = normals[k];
+			      offset++;
+		      }
+		      for (var l = 0; l<3; l++)
+		      {
+		    	//create a degenerate triangle to separate disjoint sections
+		      	vertexArray[offset+l] = vertexArray[offset-3+l%3]; //copy last vertex twice 
+		      	normalArray[offset+l] = normalArray[offset-3+l%3];
+		      }
+		      offset +=3;
+		  }
+		  gl = updateContours([vertexArray, normalArray, color], gl);
+	  }
+	  return gl;
+  }
+</script>
+
+<!-- v_Dot uses abs to make objects more easily visible for testing.
+ probably need to implement a more realistic lighting calculation -->
+<script id="vshader" type="x-shader/x-vertex">
+    uniform mat4 u_modelViewProjMatrix;
+    uniform mat4 u_normalMatrix;
+    uniform vec3 lightDir;
+
+    attribute vec3 vNormal;
+    attribute vec4 vColor;
+    attribute vec4 vPosition;
+
+    varying float v_Dot;
+    varying vec4 v_Color;
+
+    void main()
+    {
+        gl_Position = u_modelViewProjMatrix * vPosition;
+        v_Color = vColor;
+        vec4 transNormal = u_normalMatrix * vec4(vNormal, 1);
+        v_Dot = abs(dot(transNormal.xyz, lightDir)); 
+    }
+</script>
+
+<script id="fshader" type="x-shader/x-fragment">
+#ifdef GL_ES
+    precision mediump float;
+#endif
+
+    varying float v_Dot;
+    varying vec4 v_Color;
+
+    void main()
+    {
+        gl_FragColor = vec4(v_Color.xyz * v_Dot, v_Color.a);
+    }
+</script>
+
+<script>
+	var fbo;
+	function init()
+	{
+		var gl = initWebGL(
+	            // The id of the Canvas Element
+	            "canvas",
+	            // The ids of the vertex and fragment shaders
+	            "vshader", "fshader",
+	            // The vertex attribute names used by the shaders.
+	            // The order they appear here corresponds to their index
+	            // used later.
+	            [ "vNormal", "vColor", "vPosition"],
+	            // The clear color and depth values
+	            [ 0, 0, 0, 1 ], 10000 
+	            );
+		fbo = gl.createFramebuffer();
+		gl.angle = 50; //controls zooming
+		gl.uniform3f(gl.getUniformLocation(gl.program, "lightDir"), 0, 0, 1);
+		gl.mvMatrix = new J3DIMatrix4();
+        gl.u_normalMatrixLoc = gl.getUniformLocation(gl.program, "u_normalMatrix");
+        gl.normalMatrix = new J3DIMatrix4();
+        gl.u_modelViewProjMatrixLoc =
+                gl.getUniformLocation(gl.program, "u_modelViewProjMatrix");
+        gl.mvpMatrix = new J3DIMatrix4();
+        
+        gl.numContours = 0;
+        
+    	//user interaction
+        canvas.onmousemove = drag;
+        canvas.onmouseup = stopDragging;
+        canvas.onmousedown = handleClick;
+        document.addEventListener("keydown", keyPress);
+        
+        g_aball = o3djs.arcball.create(canvas.width*.9, canvas.height*.9);
+        g_math = o3djs.math;
+        g_quaternions = o3djs.quaternions;
+        
+        g_lastRot = g_math.matrix4.identity();
+        g_thisRot = g_math.matrix4.identity();
+        g_rotMat = new J3DIMatrix4(rotToArray(g_thisRot));
+        return gl;
+	}
+	
+	function handleClick(e)
+	{
+		if (e.button == 0)
+		{
+			startDragging(e);
+		}
+		else if (e.button == 2)
+		{
+			select(e);
+		}
+	}
+	
+	function select(e)
+	{
+		//location is working correctly, but cannot currently draw and read from a back buffer
+		//gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		pixels = new Uint8Array(4);
+		//10 and 35 are hard-coded offsets for canvas in window
+		gl.readPixels(e.x-10, gl.height-(e.y-35), 1,1,  gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	}
+	
+	function keyPress(evt)
+	{
+		//currently only zoom is implemented
+		var key = String.fromCharCode(evt.which);
+		if (key == "I")
+		{
+			gl.angle--;
+		}
+		else if (key == "K")
+		{
+			gl.angle++;
+		}
+	}
+	
+	function rotToArray(rot)
+	{
+		//convert a rotation to an array format for image manipulation
+		array = new Array();
+		for (var i=0; i<rot.length; i++)
+		{
+			row = rot[i];
+			for (var j = 0; j<row.length; j++)
+			{	
+				array[i*rot.length + j] = row[j];
+			}
+		}
+		return array;
+	}
+	
+	function outerBox(gl, direction)
+	{
+		//setup and bind the outer box to a buffer
+		gl.box = {}
+		gl.box[direction] = makeBox(gl, direction);
+		var colorArray = new Array();
+		
+		//x "axes" red, y green, z blue
+		var color = new Uint8Array(
+				[1,0,0,1,  1,0,0,1,  1,0,0,1,  1,0,0,1,  1,0,0,1,  1,0,0,1,  1,0,0,1,  1,0,0,1, //x red
+				 0,1,0,1,  0,1,0,1,  0,1,0,1,  0,1,0,1,  0,1,0,1,  0,1,0,1,  0,1,0,1,  0,1,0,1, //y green
+				 0,0,1,1,  0,0,1,1,  0,0,1,1,  0,0,1,1,  0,0,1,1,  0,0,1,1,  0,0,1,1,  0,0,1,1, //z blue
+				 ]
+				);
+		
+		gl.box[direction].colorObject = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl.box[direction].colorObject);
+		gl.bufferData(gl.ARRAY_BUFFER, color, gl.STATIC_DRAW);
+		
+		gl.enableVertexAttribArray(0);
+        gl.enableVertexAttribArray(1);
+        gl.enableVertexAttribArray(2);
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl.box[direction].vertexObject);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.box[direction].normalObject);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.box[direction].colorObject);
+        gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, false, 0, 0);
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.box[direction].indexObject);
+        return gl;
+		
+	}
+		
+	
+	function updateContours(contours, gl)
+	{
+		//format color and index arrays and bind contour data to buffers
+		gl[gl.numContours].numTriangles++;
+		var numTriangles = gl[gl.numContours].numTriangles;
+		gl[gl.numContours][numTriangles] ={};
+		var verts = new Float32Array(contours[0]);
+		var norms = new Float32Array(contours[1]);
+		var color = new Float32Array(contours[2]);
+		
+		var indexArray = new Array();
+		var normalArray = new Array();
+		for (var i = 0; i<verts.length/3; i++)
+		{
+			indexArray[i] = i;
+			normalArray[3*i] = 0;
+			normalArray[3*i+1] = 0;
+			normalArray[3*i+2] = 1;
+		}
+		indices = new Uint16Array(indexArray);
+		
+		var colorArray = new Array();
+		for (i = 0; i<verts.length/3; i++)
+		{
+			colorArray[4*i] = color[0]/255.0;
+			colorArray[4*i+1] = color[1]/255.0;
+			colorArray[4*i+2] = color[2]/255.0;
+			colorArray[4*i+3] = 1;
+		}
+		
+		var color = new Float32Array(colorArray);
+		
+		gl = setBufferData(gl, numTriangles, verts, norms, color, indices);
+		
+		return gl;
+	}
+	
+	function setBufferData(gl, numTriangles, verts, norms, color, indices)
+	{
+		gl[gl.numContours][numTriangles] = {};
+		gl[gl.numContours][numTriangles].numIndices = indices.length;
+		gl[gl.numContours][numTriangles].normalObject = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl[gl.numContours][numTriangles].normalObject);
+		gl.bufferData(gl.ARRAY_BUFFER, norms, gl.STATIC_DRAW);
+		
+		gl[gl.numContours][numTriangles].vertexObject = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl[gl.numContours][numTriangles].vertexObject);
+		gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		
+		gl[gl.numContours][numTriangles].indexObject = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl[gl.numContours][numTriangles].indexObject);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+		
+		gl[gl.numContours][numTriangles].colorObject = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl[gl.numContours][numTriangles].colorObject);
+		gl.bufferData(gl.ARRAY_BUFFER, color, gl.STATIC_DRAW);
+		return gl;
+	}
+	
+	
+	function bindBuffers(gl, cntNum, triangleNum)
+	{
+		gl.enableVertexAttribArray(0);
+        gl.enableVertexAttribArray(1);
+        gl.enableVertexAttribArray(2);
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, gl[cntNum][triangleNum].vertexObject);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl[cntNum][triangleNum].normalObject);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl[cntNum][triangleNum].colorObject);
+        gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl[cntNum][triangleNum].indexObject);
+        return gl;
+        
+	}
+
+    width = -1;
+    height = -1;
+
+    function reshape(gl)
+    {
+        var canvas = document.getElementById('canvas');
+        var windowWidth = window.innerWidth - 200;
+        var windowHeight = window.innerHeight - 400;
+
+        width = windowWidth;
+        height = windowHeight;
+        canvas.width = width;
+        canvas.height = height;
+        gl.width = width;
+        gl.height = height;
+
+        // Set the viewport and projection matrix for the scene
+        gl.viewport(0, 0, width, height);
+        gl.perspectiveMatrix = new J3DIMatrix4();
+        gl.perspectiveMatrix.perspective(gl.angle, width/height, 1, 10000);
+        gl.perspectiveMatrix.lookat(0, 0, 4, 0, 0, 0, 0, 1, 0);
+    }
+    
+    function drawPicture(gl, hasContours)
+    {
+    	
+        // Make sure the canvas is sized correctly.
+        reshape(gl);
+
+        // Clear the canvas
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Make a model/view matrix.
+        gl.mvMatrix.makeIdentity();
+        g_rotMat.load(rotToArray(g_thisRot));
+        gl.mvMatrix.multiply(g_rotMat);
+        
+
+        // Construct the normal matrix from the model-view matrix and pass it in
+        gl.normalMatrix.load(gl.mvMatrix);
+        gl.normalMatrix.invert();
+        gl.normalMatrix.transpose();
+        gl.normalMatrix.setUniform(gl, gl.u_normalMatrixLoc, false);
+
+        // Construct the model-view * projection matrix and pass it in
+        gl.mvpMatrix.load(gl.perspectiveMatrix);
+        gl.mvpMatrix.multiply(gl.mvMatrix);
+        gl.mvpMatrix.setUniform(gl, gl.u_modelViewProjMatrixLoc, false);
+		
+        if (hasContours == 1)
+        {
+        	for (var i = 1; i <= gl.numContours; i++)
+        	{
+        		for (var j = 1; j<=gl[i].numTriangles; j++)
+        		{	
+        			bindBuffers(gl, i, j);
+        			gl.drawElements(gl.TRIANGLE_STRIP, gl[i][j].numIndices, gl.UNSIGNED_SHORT, 0);
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+					reshape(gl);
+					bindBuffers(gl, i, j);
+					//gl.drawElements(gl.TRIANGLE_STRIP, gl[i][j].numIndices, gl.UNSIGNED_SHORT, 0);
+					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        		}
+        	}
+        }
+        
+        gl = outerBox(gl, 1);
+        gl.drawElements(gl.LINES, gl.box[1].numIndices, gl.UNSIGNED_BYTE, 0);
+		
+        // Finish up.
+        gl.flush();
+
+        // Show the framerate
+        framerate.snapshot();
+    }
+
+    function start()
+    {
+        var c = document.getElementById("canvas");
+        var w = Math.floor(window.innerWidth * 0.9);
+        var h = Math.floor(window.innerHeight * 0.9);
+        
+        has_files = 0;
+
+        c.width = w;
+        c.height = h;
+        
+        currentAngle = 0;
+        incAngle = 1;
+        framerate = new Framerate("framerate");
+    }
+    
+    function readSingleFile(evt) {
+        //Retrieve the first (and only!) File from the FileList object
+        var f = evt.target.files[0]; 
+
+        if (f) {
+        	if (has_files==0)
+        	{
+          		gl = init();
+          		has_files =1;
+        	}
+          var r = new FileReader();
+          r.onload = function(e) { 
+    	      var contents = e.target.result;
+    	      gl = formatContours(contents, gl);
+    	      setInterval(function() {drawPicture(gl, 1)}, 10);
+          }
+          r.readAsText(f);
+        } else { 
+          alert("Failed to load file");
+        }
+      }
+    document.getElementById('fileinput').addEventListener('change', readSingleFile, false);
+</script>
+<style type="text/css">
+    canvas {
+        //border: 2px solid black;
+        position:absolute;
+        top:35px;
+        left:10px;
+    }
+    .text {
+        position:absolute;
+        top:1000px;
+        left:1000px;
+        font-size:4em;
+        color: blue;
+    }
+</style>
+</head>
+
+<body onload="start()">
+
+
+<canvas id="canvas">
+    If you're seeing this your web browser doesn't support the &lt;canvas>&gt; element. Ouch!
+</canvas>
+
+<div id="framerate"></div>
+</body>
+
+</html>
